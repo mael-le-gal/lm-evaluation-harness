@@ -2,10 +2,45 @@ import argparse
 import json
 import logging
 import os
-
+import pandas as pd
+from datetime import datetime
 from lm_eval import tasks, evaluator, utils
 
 logging.getLogger("openai").setLevel(logging.WARNING)
+
+
+def save_parquet(args, results, task_names):
+    all_records = []
+    for task in task_names:
+        config = results['config']['description_dict']
+        version = results['versions'][task]
+        for metric_name, metric_value in results['results'][task].items():
+            record = {
+                'run_id': args.run_id,
+                'task': task,
+                'task_version': version,
+                'metric_name': metric_name,
+                'metric_value': metric_value,
+            }
+            if args.model == 'tgi':
+                record.update({
+                    'tgi_model_id': config.get('model_id'),
+                    'tgi_model_dtype': config.get('model_dtype'),
+                    'tgi_max_input_length': config.get('max_input_length'),
+                    'tgi_max_total_tokens': config.get('max_total_tokens'),
+                    'tgi_version': config.get('version'),
+                })
+            all_records.append(record)
+    df = pd.DataFrame.from_records(all_records)
+    # Save into parquet
+    import pathlib
+    output_base_path = args.output_base_path
+    output_base_path = (pathlib.Path(output_base_path) if output_base_path is not None else pathlib.Path("."))
+    try:
+        output_base_path.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        pass
+    df.to_parquet(os.path.join(output_base_path, f'{args.run_id}.parquet'))
 
 
 def parse_args():
@@ -30,6 +65,8 @@ def parse_args():
     parser.add_argument("--check_integrity", action="store_true")
     parser.add_argument("--write_out", action="store_true", default=False)
     parser.add_argument("--output_base_path", type=str, default=None)
+    parser.add_argument("--save_parquet", action="store_true", default=False)
+    parser.add_argument("--run_id", type=str, default=datetime.now().strftime("%Y%d%m-%H%M%S"))
 
     return parser.parse_args()
 
@@ -87,6 +124,9 @@ def main():
         f"num_fewshot: {args.num_fewshot}, batch_size: {args.batch_size}{f' ({batch_sizes})' if batch_sizes else ''}"
     )
     print(evaluator.make_table(results))
+
+    if args.save_parquet:
+        save_parquet(args, results, task_names)
 
 
 if __name__ == "__main__":

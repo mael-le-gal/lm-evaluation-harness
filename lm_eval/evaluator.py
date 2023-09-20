@@ -113,6 +113,8 @@ def simple_evaluate(
         write_out=write_out,
         output_base_path=output_base_path,
     )
+    if isinstance(lm, lm_eval.base.CachingLM) and isinstance(lm.lm, lm_eval.models.tgi.TGILM):
+        description_dict.update(lm.lm.description())
 
     # add info about the model and few shot config
     model_name = None
