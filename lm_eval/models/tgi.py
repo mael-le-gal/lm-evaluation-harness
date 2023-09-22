@@ -160,7 +160,7 @@ class TGILM(BaseLM):
             if logprobs[0] is None:
                 logprobs.pop(0)
             continuation_logprobs = logprobs[ctxlen:]
-            answer = sum(continuation_logprobs)
+            answer = (sum(continuation_logprobs), None)
             res.append(answer)
             # partial caching
             if cache_key is not None:
