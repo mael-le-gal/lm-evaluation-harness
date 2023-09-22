@@ -28,16 +28,10 @@ def http_retry(method: str, **kwargs):
 class TGILM(BaseLM):
     AUTO_TOKENIZER_CLASS: transformers.AutoTokenizer = transformers.AutoTokenizer
 
-    def __init__(self,
-        tokenizer_id: str,
-        max_gen_toks: Optional[int] = 256,
-        max_length: Optional[int] = 2048,
-    ):
+    def __init__(self, tokenizer_id: str):
         super().__init__()
-        self._max_gen_toks = max_gen_toks
-        self._max_length = max_length
-
         self._tokenizer_id = tokenizer_id
+        self.llmevha =  os.environ.get('LLMEVHA_SHA')
         self._url = os.environ['TGI_URL']
         self._bearer_token = os.environ.get('TGI_BEARER_TOKEN')
 
@@ -46,9 +40,12 @@ class TGILM(BaseLM):
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self._description = {
-            'tokenizer_id': self._tokenizer_id
+            'tokenizer_id': self._tokenizer_id,
+            'llmevha_sha': self.llmevha
         }
         tgi_config = self.tgi_call('get', '/info', None).json()
+        self._max_total_tokens = tgi_config['max_total_tokens']
+        self._max_input_length = tgi_config['max_input_length']
         self._description.update(tgi_config)
 
     def description(self):
@@ -68,11 +65,11 @@ class TGILM(BaseLM):
 
     @property
     def max_length(self):
-        return self._max_length
+        return self._max_total_tokens
 
     @property
     def max_gen_toks(self):
-        return self._max_gen_toks
+        return self._max_total_tokens - self._max_input_length
 
     @property
     def batch_size(self):
@@ -99,7 +96,36 @@ class TGILM(BaseLM):
         raise NotImplementedError()
 
     def greedy_until(self, requests):
-        raise NotImplementedError()
+        if not requests:
+            return []
+        res = []
+
+        def _collate(x):
+            toks = self.tok_encode(x[0])
+            return len(toks), x[0]
+
+        re_ord = utils.Reorderer(requests, _collate)
+
+        for context, until in re_ord.get_reordered():
+            context_enc = self.tok_encode(context)
+            truncated_context_enc = context_enc[-(self.max_length - self.max_gen_toks) :]
+            truncated_prompt = self.tokenizer.decode(truncated_context_enc)
+            response = self.tgi_call('post', '/generate', {
+                "inputs": truncated_prompt,
+                "parameters": {
+                    "max_new_tokens": self.max_gen_toks,
+                    "stop": until["until"]
+                }
+            })
+            resp = response.json()
+            s = resp["generated_text"]
+            for term in until:
+                s = s.split(term)[0]
+            # partial caching
+            self.cache_hook.add_partial("greedy_until", (context, until), s)
+            res.append(s)
+
+        return re_ord.get_original(res)
 
     def _loglikelihood_tokens(self, requests, disable_tqdm=False, override_bs=None):
         res = []
@@ -134,8 +160,7 @@ class TGILM(BaseLM):
             if logprobs[0] is None:
                 logprobs.pop(0)
             continuation_logprobs = logprobs[ctxlen:]
-            sum_continuation_logprobs = sum(continuation_logprobs)
-            answer = (sum_continuation_logprobs, None)
+            answer = sum(continuation_logprobs)
             res.append(answer)
             # partial caching
             if cache_key is not None:
