@@ -14,6 +14,7 @@ also determine when no answer is supported by the paragraph and abstain from ans
 Homepage: https://rajpurkar.github.io/SQuAD-explorer/
 """
 import datasets
+import evaluate
 from math import exp
 from lm_eval.base import rf, Task
 from functools import partial
@@ -33,7 +34,7 @@ _CITATION = """
 
 
 def _squad_metric(predictions, references):
-    squad_metric = datasets.load_metric("squad_v2")
+    squad_metric = evaluate.load("squad_v2")
     return squad_metric.compute(predictions=predictions, references=references)
 
 
@@ -92,9 +93,9 @@ class SQuAD2(Task):
         answer_list = doc["answers"]["text"]
         if len(answer_list) > 0:
             answer = answer_list[0]
+            return " " + answer
         else:
-            answer = "unanswerable"
-        return " " + answer
+            return self.unanswerable()
 
     def construct_requests(self, doc, ctx):
         """Uses RequestFactory to construct Requests and returns an iterable of
@@ -107,9 +108,15 @@ class SQuAD2(Task):
             language description, as well as the few shot examples, and the question
             part of the document for `doc`.
         """
-        continuation = rf.greedy_until(ctx, {"until": ["\n"]})
-        is_unanswerable = rf.loglikelihood(ctx, " " + "unanswerable")
+        continuation = rf.greedy_until(ctx, {"until": self.until()})
+        is_unanswerable = rf.loglikelihood(ctx, self.unanswerable())
         return continuation, is_unanswerable
+
+    def until(self):
+        return ["\n"]
+
+    def unanswerable(self):
+        return " " + "unanswerable"
 
     def process_results(self, doc, results):
         """Take a single document and the LM results and evaluates, returning a
@@ -127,7 +134,7 @@ class SQuAD2(Task):
 
         predictions = {
             "id": doc["id"],
-            "prediction_text": continuation,
+            "prediction_text": continuation if continuation != self.unanswerable() else "",
             "no_answer_probability": no_answer_probability,
         }
 
@@ -145,6 +152,10 @@ class SQuAD2(Task):
                 predictions,
                 references,
             ),  # The F-score of predicted tokens versus the gold answer
+            "total": (
+                predictions,
+                references,
+            ),
             "HasAns_exact": (
                 predictions,
                 references,
@@ -153,6 +164,10 @@ class SQuAD2(Task):
                 predictions,
                 references,
             ),  # The F-score of predicted tokens versus the gold answer
+            "HasAns_total": (
+                predictions,
+                references,
+            ),
             "NoAns_exact": (
                 predictions,
                 references,
@@ -161,11 +176,20 @@ class SQuAD2(Task):
                 predictions,
                 references,
             ),  # The F-score of predicted tokens versus the gold answer
+            "NoAns_total": (
+                predictions,
+                references,
+            ),
             "best_exact": (
                 predictions,
                 references,
             ),  # Best exact match (with varying threshold)
+            "best_exact_thresh": (
+                predictions,
+                references,
+            ),
             "best_f1": (predictions, references),  # Best F1 (with varying threshold)
+            "best_f1_thresh": (predictions, references)
         }
 
     def aggregation(self):
@@ -181,24 +205,39 @@ class SQuAD2(Task):
             "f1": partial(
                 _squad_agg, "f1"
             ),  # The F-score of predicted tokens versus the gold answer
+            "total": partial(
+                _squad_agg, "total"
+            ),
             "HasAns_exact": partial(
                 _squad_agg, "HasAns_exact"
             ),  # Exact match (the normalized answer exactly match the gold answer)
             "HasAns_f1": partial(
                 _squad_agg, "HasAns_f1"
             ),  # The F-score of predicted tokens versus the gold answer
+            "HasAns_total": partial(
+                _squad_agg, "HasAns_total"
+            ),
             "NoAns_exact": partial(
                 _squad_agg, "NoAns_exact"
             ),  # Exact match (the normalized answer exactly match the gold answer)
             "NoAns_f1": partial(
                 _squad_agg, "NoAns_f1"
             ),  # The F-score of predicted tokens versus the gold answer
+            "NoAns_total": partial(
+                _squad_agg, "NoAns_total"
+            ),
             "best_exact": partial(
                 _squad_agg, "best_exact"
             ),  # Best exact match (with varying threshold)
+            "best_exact_thresh": partial(
+                _squad_agg, "best_exact_thresh"
+            ),
             "best_f1": partial(
                 _squad_agg, "best_f1"
             ),  # Best F1 (with varying threshold)
+            "best_f1_thresh": partial(
+                _squad_agg, "best_f1_thresh"
+            ),
         }
 
     def higher_is_better(self):

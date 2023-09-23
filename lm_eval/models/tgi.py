@@ -114,12 +114,13 @@ class TGILM(BaseLM):
                 "inputs": truncated_prompt,
                 "parameters": {
                     "max_new_tokens": self.max_gen_toks,
+                    "do_sample": False,
                     "stop": until["until"]
                 }
             })
             resp = response.json()
             s = resp["generated_text"]
-            for term in until:
+            for term in until["until"]:
                 s = s.split(term)[0]
             # partial caching
             self.cache_hook.add_partial("greedy_until", (context, until), s)

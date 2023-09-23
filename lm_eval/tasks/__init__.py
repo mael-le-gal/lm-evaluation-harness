@@ -19,6 +19,7 @@ from . import hellaswag
 from . import swag
 from . import openbookqa
 from . import squad
+from . import squad_prompt
 from . import naturalqs
 from . import nqopen
 from . import sat
@@ -150,6 +151,7 @@ TASK_REGISTRY = {
     "swag": swag.SWAG,
     "openbookqa": openbookqa.OpenBookQA,
     "squad2": squad.SQuAD2,
+    "squad2_prompt": squad_prompt.SQuAD2OVH,
     "race": race.RACE,
     # "naturalqs": naturalqs.NaturalQs, # not implemented yet
     "nq_open": nqopen.NQOpen,

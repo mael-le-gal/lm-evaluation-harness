@@ -19,9 +19,14 @@ def save_parquet(args, results, task_names):
                 'run_id': args.run_id,
                 'task': task,
                 'task_version': version,
+                'task_few_shot': results['config']['num_fewshot'],
+                'task_limit': results['config']['limit'],
                 'metric_name': metric_name,
                 'metric_value': metric_value,
             }
+            llmevha_sha = config.get('model_id')
+            if llmevha_sha is not None:
+                record['llmevha_sha'] = llmevha_sha
             if args.model == 'tgi':
                 record.update({
                     'tgi_model_id': config.get('model_id'),

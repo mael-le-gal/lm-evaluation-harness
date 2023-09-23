@@ -1,0 +1,10 @@
+<s>[INST]<<SYS>>You are a very basic assistant providing minimal and short answers.<</SYS>>
+Answer the question at the end by only giving short quote from the following context. If the context doesn't provide the ability to answer correctly the question the quotation should be `unanswerable`.
+
+Title: ${title}
+
+Context:
+${ctx}
+
+Question:
+${question}[/INST]The quotation from the context that answers that last question is `${completion}`
