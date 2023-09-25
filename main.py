@@ -24,7 +24,7 @@ def save_parquet(args, results, task_names):
                 'metric_name': metric_name,
                 'metric_value': metric_value,
             }
-            llmevha_sha = config.get('model_id')
+            llmevha_sha = config.get('llmevha_sha')
             if llmevha_sha is not None:
                 record['llmevha_sha'] = llmevha_sha
             if args.model == 'tgi':
@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument("--write_out", action="store_true", default=False)
     parser.add_argument("--output_base_path", type=str, default=None)
     parser.add_argument("--save_parquet", action="store_true", default=False)
-    parser.add_argument("--run_id", type=str, default=datetime.now().strftime("%Y%d%m-%H%M%S"))
+    parser.add_argument("--run_id", type=str, default=datetime.now().strftime("%Y%m%d-%H%M%S"))
 
     return parser.parse_args()
 

@@ -31,7 +31,7 @@ class TGILM(BaseLM):
     def __init__(self, tokenizer_id: str):
         super().__init__()
         self._tokenizer_id = tokenizer_id
-        self.llmevha =  os.environ.get('LLMEVHA_SHA')
+        self.llmevha = os.environ.get('LLMEVHA_SHA')
         self._url = os.environ['TGI_URL']
         self._bearer_token = os.environ.get('TGI_BEARER_TOKEN')
 
