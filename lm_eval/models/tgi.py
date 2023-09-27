@@ -1,11 +1,9 @@
 import transformers
 from lm_eval.base import BaseLM
-from typing import Optional
 from lm_eval import utils
 from tqdm import tqdm
 import requests as _requests
 import time
-from datetime import datetime
 import os
 
 
@@ -14,9 +12,15 @@ def http_retry(method: str, **kwargs):
     while True:
         try:
             if method == 'post':
-                return _requests.post(**kwargs)
+                response = _requests.post(**kwargs)
             elif method == 'get':
-                return _requests.get(**kwargs)
+                response = _requests.get(**kwargs)
+
+            if response.status_code != 200:
+                raise _requests.exceptions.RequestException(f'Received a {response.status_code} http status : {response}')
+
+            return response
+
         except _requests.exceptions.RequestException:
             import traceback
 
@@ -69,7 +73,7 @@ class TGILM(BaseLM):
 
     @property
     def max_gen_toks(self):
-        return self._max_total_tokens - self._max_input_length
+        return 256
 
     @property
     def batch_size(self):
