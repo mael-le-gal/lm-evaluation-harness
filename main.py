@@ -3,10 +3,17 @@ import json
 import logging
 import os
 import pandas as pd
+import random
+import string
 from datetime import datetime
 from lm_eval import tasks, evaluator, utils
 
 logging.getLogger("openai").setLevel(logging.WARNING)
+
+
+def get_random_string(length):
+    # With combination of lower and upper case
+    return ''.join(random.choice(string.ascii_letters) for i in range(length))
 
 
 def save_parquet(args, results, task_names):
@@ -49,6 +56,8 @@ def save_parquet(args, results, task_names):
 
 
 def parse_args():
+    date_str = datetime.now().strftime("%Y%m%d-%H%M%S")
+    random_suffix = get_random_string(8)
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
     parser.add_argument("--model_args", default="")
@@ -71,7 +80,7 @@ def parse_args():
     parser.add_argument("--write_out", action="store_true", default=False)
     parser.add_argument("--output_base_path", type=str, default=None)
     parser.add_argument("--save_parquet", action="store_true", default=False)
-    parser.add_argument("--run_id", type=str, default=datetime.now().strftime("%Y%m%d-%H%M%S"))
+    parser.add_argument("--run_id", type=str, default=f"{date_str}-{random_suffix}")
 
     return parser.parse_args()
 

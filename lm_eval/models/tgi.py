@@ -112,12 +112,14 @@ class TGILM(BaseLM):
 
         for context, until in re_ord.get_reordered():
             context_enc = self.tok_encode(context)
-            truncated_context_enc = context_enc[-(self.max_length - self.max_gen_toks) :]
+            max_new_tokens = self.max_gen_toks
+            max_truncated_prompt_length = self.max_length - max_new_tokens
+            truncated_context_enc = context_enc[-max_truncated_prompt_length:]
             truncated_prompt = self.tokenizer.decode(truncated_context_enc)
             response = self.tgi_call('post', '/generate', {
                 "inputs": truncated_prompt,
                 "parameters": {
-                    "max_new_tokens": self.max_gen_toks,
+                    "max_new_tokens": max_new_tokens,
                     "do_sample": False,
                     "stop": until["until"]
                 }
@@ -146,15 +148,16 @@ class TGILM(BaseLM):
 
         for cache_key, context_enc, continuation_enc in tqdm(re_ord.get_reordered(), disable=disable_tqdm):
             full_prompt_enc = context_enc + continuation_enc
-            # max_length+1 because the API takes up to 2049 tokens, including the first context token
-            truncated_prompt_enc = full_prompt_enc[-(self.max_length + 1) :]
+            max_new_tokens = 1
+            max_truncated_prompt_length = self.max_length - max_new_tokens
+            truncated_prompt_enc = full_prompt_enc[-max_truncated_prompt_length:]
             truncated_prompt = self.tokenizer.decode(truncated_prompt_enc)
             # TODO: the logic is much simpler if we just look at the length of continuation tokens
             ctxlen = len(context_enc) - max(0, len(context_enc) + len(continuation_enc) - (self.max_length + 1))
             response = self.tgi_call('post', '/generate', {
                 "inputs": truncated_prompt,
                 "parameters": {
-                    "max_new_tokens": 1,
+                    "max_new_tokens": max_new_tokens,
                     "do_sample": False,
                     "decoder_input_details": True
                 }
