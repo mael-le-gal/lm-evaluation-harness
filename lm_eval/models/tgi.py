@@ -1,7 +1,6 @@
 import transformers
 from lm_eval.base import BaseLM
 from lm_eval import utils
-from tqdm import tqdm
 import requests as _requests
 import time
 import os
@@ -9,7 +8,10 @@ import os
 
 def http_retry(method: str, **kwargs):
     backoff_time = 3
+    retry_nb = 0
     while True:
+        if retry_nb != 0:
+            print(f"Retrying http call... Retry number {retry_nb}")
         try:
             if method == 'post':
                 response = _requests.post(**kwargs)
@@ -17,16 +19,17 @@ def http_retry(method: str, **kwargs):
                 response = _requests.get(**kwargs)
 
             if response.status_code != 200:
-                raise _requests.exceptions.RequestException(f'Received a {response.status_code} http status : {response}')
+                raise _requests.exceptions.RequestException(f'Received a {response.status_code} http status : {response.text}')
 
             return response
 
         except _requests.exceptions.RequestException:
             import traceback
-
+            retry_nb += 1
             traceback.print_exc()
             time.sleep(backoff_time)
-            backoff_time *= 1.5
+            if backoff_time < 60:
+                backoff_time *= 1.5
 
 
 class TGILM(BaseLM):
@@ -38,7 +41,6 @@ class TGILM(BaseLM):
         self.llmevha = os.environ.get('LLMEVHA_SHA')
         self._url = os.environ['TGI_URL']
         self._bearer_token = os.environ.get('TGI_BEARER_TOKEN')
-
 
         self.tokenizer = self.AUTO_TOKENIZER_CLASS.from_pretrained(tokenizer_id, use_auth_token=True)
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -109,8 +111,12 @@ class TGILM(BaseLM):
             return len(toks), x[0]
 
         re_ord = utils.Reorderer(requests, _collate)
+        all_reord = re_ord.get_reordered()
+        total = len(all_reord)
 
-        for context, until in re_ord.get_reordered():
+        for idx, (context, until) in enumerate(all_reord):
+            if idx % 10 == 0:
+                print(f"Evaluating loglikelihood record {idx}/{total}")
             context_enc = self.tok_encode(context)
             max_new_tokens = self.max_gen_toks
             max_truncated_prompt_length = self.max_length - max_new_tokens
@@ -145,8 +151,12 @@ class TGILM(BaseLM):
             return -len(toks), tuple(toks)
 
         re_ord = utils.Reorderer(requests, _collate)
+        all_reord = re_ord.get_reordered()
+        total = len(all_reord)
 
-        for cache_key, context_enc, continuation_enc in tqdm(re_ord.get_reordered(), disable=disable_tqdm):
+        for idx, (cache_key, context_enc, continuation_enc) in enumerate(all_reord):
+            if idx % 10 == 0:
+                print(f"Evaluating loglikelihood record {idx}/{total}")
             full_prompt_enc = context_enc + continuation_enc
             max_new_tokens = 1
             max_truncated_prompt_length = self.max_length - max_new_tokens
