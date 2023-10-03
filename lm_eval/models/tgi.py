@@ -4,6 +4,7 @@ from lm_eval import utils
 import requests as _requests
 import time
 import os
+import sys
 
 
 def http_retry(method: str, **kwargs):
@@ -11,7 +12,7 @@ def http_retry(method: str, **kwargs):
     retry_nb = 0
     while True:
         if retry_nb != 0:
-            print(f"Retrying http call... Retry number {retry_nb}")
+            print(f"Retrying http call... Retry number {retry_nb}", file=sys.stderr)
         try:
             if method == 'post':
                 response = _requests.post(**kwargs)
@@ -116,7 +117,7 @@ class TGILM(BaseLM):
 
         for idx, (context, until) in enumerate(all_reord):
             if idx % 10 == 0:
-                print(f"Evaluating loglikelihood record {idx}/{total}")
+                print(f"Evaluating loglikelihood record {idx}/{total}", file=sys.stderr)
             context_enc = self.tok_encode(context)
             max_new_tokens = self.max_gen_toks
             max_truncated_prompt_length = self.max_length - max_new_tokens
@@ -156,7 +157,7 @@ class TGILM(BaseLM):
 
         for idx, (cache_key, context_enc, continuation_enc) in enumerate(all_reord):
             if idx % 10 == 0:
-                print(f"Evaluating loglikelihood record {idx}/{total}")
+                print(f"Evaluating loglikelihood record {idx}/{total}", file=sys.stderr)
             full_prompt_enc = context_enc + continuation_enc
             max_new_tokens = 1
             max_truncated_prompt_length = self.max_length - max_new_tokens
